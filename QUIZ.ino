@@ -1,0 +1,112 @@
+#include <Ultrasonic.h>
+#include <LiquidCrystal_I2C.h>
+#include "RTClib.h"
+#include <Stepper.h>
+
+
+
+int distance;
+int previousDistance = 100;
+int state = 0;
+int eggCollected = 0;
+const int stepsPerRevolution = 2048;
+float stepPerangle = 5.66111111;
+
+RTC_DS3231 rtc;
+LiquidCrystal_I2C lcd(0x27,16,2);
+Ultrasonic ultrasonic(12, 13);
+Stepper myStepper(stepsPerRevolution, 2, 4, 3, 5);
+
+
+void setup() {
+  lcd.init();
+  lcd.clear();
+  lcd.backlight();
+  Serial.begin(115200);
+  myStepper.setSpeed(5);
+
+  if (!rtc.begin()) {
+    lcd.setCursor(0, 0);
+    lcd.print("RTC Not Found!");
+    Serial.println("Couldn't find RTC module.");
+    while (1); 
+  }
+
+  pinMode(A0, INPUT);
+}
+
+void loop() {
+  // put your main code here, to run repeatedly:
+  Serial.println("TEST");
+  if(state == 0){
+    lcd.clear();
+    lcd.setCursor(0,0);
+    lcd.print("Collected ");
+    lcd.print(eggCollected, DEC);
+    lcd.print(" eggs");
+
+    distance = ultrasonic.read();
+    Serial.println(distance);
+    if(previousDistance <= 15 && distance > previousDistance && distance > 50){
+      lcd.clear();
+      lcd.setCursor(0,0);
+      lcd.println("chicken detected");
+      state = 1;
+      return;
+    }
+    previousDistance = distance;
+    delay(100);
+
+  }
+  if(state == 1){
+    previousDistance = 1000;
+    TimeSpan delayS(0, 0, 0, 10);
+    DateTime now = rtc.now();
+    DateTime after = now+delayS;
+    lcd.setCursor(0,1);
+    lcd.println("Collect in ");
+    
+    while(now < after){
+      // Serial.println("test2");
+      TimeSpan different = after-now;
+      int seconds = different.seconds();
+      lcd.setCursor(11,1);
+      lcd.print(seconds, DEC);
+      if(seconds < 10)
+        lcd.print(" ");
+      delay(50);
+      now = rtc.now();
+    }
+
+    myStepper.step(45*stepPerangle);
+    int nowMilli = millis();
+    int nextMilli = nowMilli + 5000;
+    lcd.clear();
+    lcd.setCursor(0,0);
+    lcd.print("Waiting for egg");
+    
+    bool foundEgg = false;
+    while(nowMilli < nextMilli){
+      if(digitalRead(A0) == LOW){
+        foundEgg = true;
+        break;
+      }
+      nowMilli = millis();
+    }
+    lcd.clear();
+    if(!foundEgg){
+      lcd.setCursor(0,0);
+      lcd.print("No egg found");
+      delay(1000);
+    }else{
+      eggCollected++;
+      lcd.setCursor(0,0);
+      lcd.print("Egg found");
+      delay(1000);
+    }
+    myStepper.step(-45*stepPerangle);
+    state = 0;
+  }
+  Serial.println(state);
+
+}
