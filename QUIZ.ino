@@ -19,6 +19,7 @@ Stepper myStepper(stepsPerRevolution, 2, 4, 3, 5);
 
 
 void setup() {
+  //setup peripherals
   lcd.init();
   lcd.clear();
   lcd.backlight();
@@ -32,12 +33,12 @@ void setup() {
     while (1); 
   }
 
+  //Pin for IR sensor
   pinMode(A0, INPUT);
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-  Serial.println("TEST");
+  //State 0 waiting for ducks
   if(state == 0){
     lcd.clear();
     lcd.setCursor(0,0);
@@ -46,7 +47,7 @@ void loop() {
     lcd.print(" eggs");
 
     distance = ultrasonic.read();
-    Serial.println(distance);
+    //Only collect if no duck is present
     if(previousDistance <= 15 && distance > previousDistance && distance > 50){
       lcd.clear();
       lcd.setCursor(0,0);
@@ -58,6 +59,8 @@ void loop() {
     delay(100);
 
   }
+
+  //State 1 collects eggs
   if(state == 1){
     previousDistance = 1000;
     TimeSpan delayS(0, 0, 0, 10);
@@ -86,6 +89,7 @@ void loop() {
     lcd.print("Waiting for egg");
     
     bool foundEgg = false;
+    //Non blocking delay for detecting eggs
     while(nowMilli < nextMilli){
       if(digitalRead(A0) == LOW){
         foundEgg = true;
@@ -95,18 +99,32 @@ void loop() {
     }
     lcd.clear();
     if(!foundEgg){
+      Serial.print("Egg not found! -");
       lcd.setCursor(0,0);
       lcd.print("No egg found");
       delay(1000);
     }else{
       eggCollected++;
+      Serial.print("Egg found! Total ");
+      Serial.print(eggCollected);
+      Serial.print(" -");
       lcd.setCursor(0,0);
       lcd.print("Egg found");
       delay(1000);
     }
+
+    DateTime stamp = rtc.now();
+    Serial.print(stamp.hour(), DEC);
+    Serial.print(':');
+    if (stamp.minute() < 10) Serial.print('0');
+    Serial.print(stamp.minute(), DEC);
+    Serial.print(':');
+    if (stamp.second() < 10) Serial.print('0');
+    Serial.print(stamp.second(), DEC);
+    
+    Serial.println();
+
     myStepper.step(-45*stepPerangle);
     state = 0;
   }
-  Serial.println(state);
-
 }
